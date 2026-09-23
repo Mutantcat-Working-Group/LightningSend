@@ -12,7 +12,7 @@
 #endif
 
 #define MyAppName "LightingSend"
-#define MyAppVersion "1.18.2"
+#define MyAppVersion "1.0.20260923"
 #define MyAppPublisher "Tien Do Nam"
 #define MyAppURL "https://localsend.org"
 #define MyAppExeName "lightingsend_app.exe"

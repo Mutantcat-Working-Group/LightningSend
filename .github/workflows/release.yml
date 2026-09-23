@@ -1,12 +1,19 @@
-name: Release Draft
+name: Release
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  # Each platform build lives in its own reusable workflow (also dispatchable standalone),
-  # so the release build and the individual workflows cannot drift apart.
-  # Each called workflow computes the version from pubspec.yaml itself.
+  # Each platform build lives in its own reusable workflow (also dispatchable
+  # standalone), so the release build and the individual workflows cannot
+  # drift apart. Each called workflow computes the version from pubspec.yaml
+  # itself.
   build_apk:
     uses: ./.github/workflows/build_android_apk.yml
     secrets: inherit
@@ -25,6 +32,12 @@ jobs:
 
   build_appimage_x86_64:
     uses: ./.github/workflows/build_linux_appimage_x64.yml
+
+  build_appimage_arm_64:
+    uses: ./.github/workflows/build_linux_appimage_arm64.yml
+
+  build_macos_dmg:
+    uses: ./.github/workflows/build_macos_dmg.yml
 
   build_windows_zip_x86_64:
     uses: ./.github/workflows/build_windows_zip_x64.yml
@@ -65,6 +78,8 @@ jobs:
       - build_deb_x86_64
       - build_deb_arm_64
       - build_appimage_x86_64
+      - build_appimage_arm_64
+      - build_macos_dmg
       - build_windows_zip_x86_64
       - build_windows_zip_arm_64
       - build_windows_exe_x86_64
@@ -79,301 +94,181 @@ jobs:
         id: get_version
         run: |
           VERSION=$(sed -n 's/^version: \([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p' app/pubspec.yaml)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Draft release
-        id: draft_release
-        uses: release-drafter/release-drafter@v6
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag: v${{ steps.get_version.outputs.version }}
-          name: v${{ steps.get_version.outputs.version }}
-
-      # APK
-      - name: Download apk file
+      - name: Download APK artifact
         uses: actions/download-artifact@v7
         with:
           name: apk-result
-          path: apk-result
+          path: artifacts/apk-result
 
-      - name: Copy apk file to root
-        run: cp apk-result/*.apk .
-
-      - name: Upload Release Asset (arm32v7)
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.draft_release.outputs.upload_url }}
-          asset_path: app-armeabi-v7a-release.apk
-          asset_name: LightingSend-${{ steps.get_version.outputs.version }}-android-arm32v7.apk
-          asset_content_type: application/vnd.android.package-archive
-
-      - name: Upload Release Asset (arm64v8)
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.draft_release.outputs.upload_url }}
-          asset_path: app-arm64-v8a-release.apk
-          asset_name: LightingSend-${{ steps.get_version.outputs.version }}-android-arm64v8.apk
-          asset_content_type: application/vnd.android.package-archive
-
-      - name: Upload Release Asset (x64)
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.draft_release.outputs.upload_url }}
-          asset_path: app-x86_64-release.apk
-          asset_name: LightingSend-${{ steps.get_version.outputs.version }}-android-x64.apk
-          asset_content_type: application/vnd.android.package-archive
-
-      # TAR.GZ (x86_64)
-      - name: Download tar.gz file
+      - name: Download Linux tar.gz artifacts
         uses: actions/download-artifact@v7
         with:
           name: tar-gz-x86-64-result
-          path: tar-gz-x86-64-result
+          path: artifacts/tar-gz-x86-64-result
 
-      - name: List files in tar.gz-directory
-        run: ls -l tar-gz-x86-64-result
-
-      - name: Copy tar.gz file to root
-        run: cp tar-gz-x86-64-result/* result.tar.gz
-
-      - name: Upload Release Asset (tar.gz)
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.draft_release.outputs.upload_url }}
-          asset_path: result.tar.gz
-          asset_name: LightingSend-${{ steps.get_version.outputs.version }}-linux-x86-64.tar.gz
-          asset_content_type: application/gzip
-
-      # TAR.GZ (arm_64)
-      - name: Download tar.gz file
+      - name: Download arm64 Linux tar.gz artifact
         uses: actions/download-artifact@v7
         with:
           name: tar-gz-arm-64-result
-          path: tar-gz-arm-64-result
+          path: artifacts/tar-gz-arm-64-result
 
-      - name: List files in tar.gz-directory
-        run: ls -l tar-gz-arm-64-result
-
-      - name: Copy tar.gz file to root
-        run: cp tar-gz-arm-64-result/* result.tar.gz
-
-      - name: Upload Release Asset (tar.gz)
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.draft_release.outputs.upload_url }}
-          asset_path: result.tar.gz
-          asset_name: LightingSend-${{ steps.get_version.outputs.version }}-linux-arm-64.tar.gz
-          asset_content_type: application/gzip
-
-      # DEB (x86_64)
-      - name: Download deb file
+      - name: Download deb artifacts
         uses: actions/download-artifact@v7
         with:
           name: deb-x86-64-result
-          path: deb-x86-64-result
+          path: artifacts/deb-x86-64-result
 
-      - name: Copy deb file to root
-        run: cp deb-x86-64-result/*.deb result.deb
-
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.draft_release.outputs.upload_url }}
-          asset_path: result.deb
-          asset_name: LightingSend-${{ steps.get_version.outputs.version }}-linux-x86-64.deb
-          asset_content_type: application/vnd.debian.binary-package
-
-      # DEB (arm_64)
-      - name: Download deb file
+      - name: Download arm64 deb artifact
         uses: actions/download-artifact@v7
         with:
           name: deb-arm-64-result
-          path: deb-arm-64-result
+          path: artifacts/deb-arm-64-result
 
-      - name: Copy deb file to root
-        run: cp deb-arm-64-result/*.deb result.deb
-
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.draft_release.outputs.upload_url }}
-          asset_path: result.deb
-          asset_name: LightingSend-${{ steps.get_version.outputs.version }}-linux-arm-64.deb
-          asset_content_type: application/vnd.debian.binary-package
-
-      # APPIMAGE (x86_64)
-      - name: Download AppImage file
+      - name: Download AppImage artifacts
         uses: actions/download-artifact@v7
         with:
           name: appimage-x86-64-result
-          path: appimage-x86-64-result
+          path: artifacts/appimage-x86-64-result
 
-      - name: List files in appimage-directory
-        run: ls -l appimage-x86-64-result
-
-      - name: Copy AppImage file to root
-        run: |
-          for file in appimage-x86-64-result/*; do
-            if [[ $file == *.AppImage && $file != *.AppImage.zsync ]]; then
-              cp "$file" result.AppImage
-            fi
-          done
-
-      - name: Upload Release Asset (AppImage)
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download arm64 AppImage artifact
+        uses: actions/download-artifact@v7
         with:
-          upload_url: ${{ steps.draft_release.outputs.upload_url }}
-          asset_path: result.AppImage
-          asset_name: LightingSend-${{ steps.get_version.outputs.version }}-linux-x86-64.AppImage
-          asset_content_type: application/x-appimage
+          name: appimage-arm-64-result
+          path: artifacts/appimage-arm-64-result
 
-      # WINDOWS ZIP (x86_64)
-      - name: Download windows zip file
+      - name: Download macOS DMG artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: macos-dmg-arm64-result
+          path: artifacts/macos-dmg-arm64-result
+
+      - name: Download x86_64 macOS DMG artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: macos-dmg-x86_64-result
+          path: artifacts/macos-dmg-x86_64-result
+
+      - name: Download Windows zip artifacts
         uses: actions/download-artifact@v7
         with:
           name: windows-zip-x86-64-result
-          path: windows-zip-x86-64-result
+          path: artifacts/windows-zip-x86-64-result
 
-      - name: Copy zip file to root
-        run: cp windows-zip-x86-64-result/*.zip result.zip
-
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.draft_release.outputs.upload_url }}
-          asset_path: result.zip
-          asset_name: LightingSend-${{ steps.get_version.outputs.version }}-windows-x86-64.zip
-          asset_content_type: application/zip
-
-      # WINDOWS ZIP (arm_64)
-      - name: Download windows zip file
+      - name: Download arm64 Windows zip artifact
         uses: actions/download-artifact@v7
         with:
           name: windows-zip-arm-64-result
-          path: windows-zip-arm-64-result
+          path: artifacts/windows-zip-arm-64-result
 
-      - name: Copy zip file to root
-        run: cp windows-zip-arm-64-result/*.zip result.zip
-
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.draft_release.outputs.upload_url }}
-          asset_path: result.zip
-          asset_name: LightingSend-${{ steps.get_version.outputs.version }}-windows-arm-64.zip
-          asset_content_type: application/zip
-
-      # WINDOWS EXE (x86_64)
-      - name: Download windows exe file
+      - name: Download Windows installer artifact
         uses: actions/download-artifact@v7
         with:
           name: windows-exe-x86-64-result
-          path: windows-exe-x86-64-result
+          path: artifacts/windows-exe-x86-64-result
 
-      - name: Copy exe file to root
-        run: cp windows-exe-x86-64-result/*.exe result.exe
-
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.draft_release.outputs.upload_url }}
-          asset_path: result.exe
-          asset_name: LightingSend-${{ steps.get_version.outputs.version }}-windows-x86-64.exe
-          asset_content_type: application/vnd.microsoft.portable-executable
-
-      # LINUX CLI (x86_64)
-      - name: Download linux CLI file
+      - name: Download Linux CLI artifacts
         uses: actions/download-artifact@v7
         with:
           name: cli-linux-x86-64-result
-          path: cli-linux-x86-64-result
+          path: artifacts/cli-linux-x86-64-result
 
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.draft_release.outputs.upload_url }}
-          asset_path: cli-linux-x86-64-result/LightingSend-CLI-${{ steps.get_version.outputs.version }}-linux-x86-64.tar.gz
-          asset_name: LightingSend-CLI-${{ steps.get_version.outputs.version }}-linux-x86-64.tar.gz
-          asset_content_type: application/gzip
-
-      # LINUX CLI (arm_64)
-      - name: Download linux CLI file
+      - name: Download arm64 Linux CLI artifact
         uses: actions/download-artifact@v7
         with:
           name: cli-linux-arm-64-result
-          path: cli-linux-arm-64-result
+          path: artifacts/cli-linux-arm-64-result
 
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.draft_release.outputs.upload_url }}
-          asset_path: cli-linux-arm-64-result/LightingSend-CLI-${{ steps.get_version.outputs.version }}-linux-arm-64.tar.gz
-          asset_name: LightingSend-CLI-${{ steps.get_version.outputs.version }}-linux-arm-64.tar.gz
-          asset_content_type: application/gzip
-
-      # WINDOWS CLI EXE (x86_64)
-      - name: Download windows CLI exe file
+      - name: Download Windows CLI artifacts
         uses: actions/download-artifact@v7
         with:
           name: windows-cli-exe-x86-64-result
-          path: windows-cli-exe-x86-64-result
+          path: artifacts/windows-cli-exe-x86-64-result
 
-      - name: Copy CLI exe file to root
-        run: cp windows-cli-exe-x86-64-result/*.exe result-cli.exe
-
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.draft_release.outputs.upload_url }}
-          asset_path: result-cli.exe
-          asset_name: LightingSend-CLI-${{ steps.get_version.outputs.version }}-windows-x86-64.exe
-          asset_content_type: application/vnd.microsoft.portable-executable
-
-      # WINDOWS CLI EXE (arm_64)
-      - name: Download windows CLI exe file
+      - name: Download arm64 Windows CLI artifact
         uses: actions/download-artifact@v7
         with:
           name: windows-cli-exe-arm-64-result
-          path: windows-cli-exe-arm-64-result
+          path: artifacts/windows-cli-exe-arm-64-result
 
-      - name: Copy CLI exe file to root
-        run: cp windows-cli-exe-arm-64-result/*.exe result-cli.exe
+      - name: Collect release assets
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.get_version.outputs.version }}"
+          mkdir -p release-assets
 
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          cp_first() {
+            local src="$1" pattern="$2" dest="$3"
+            local file
+            file="$(find "${src}" -maxdepth 1 -type f -name "${pattern}" -print -quit)"
+            if [ -z "${file}" ]; then
+              echo "::error::no file matching ${pattern} found in ${src}"
+              ls -la "${src}"
+              exit 1
+            fi
+            cp -v "${file}" "${dest}"
+          }
+
+          cp -v artifacts/apk-result/app-armeabi-v7a-release.apk "release-assets/LightingSend-${VERSION}-android-arm32v7.apk"
+          cp -v artifacts/apk-result/app-arm64-v8a-release.apk "release-assets/LightingSend-${VERSION}-android-arm64v8.apk"
+          cp -v artifacts/apk-result/app-x86_64-release.apk "release-assets/LightingSend-${VERSION}-android-x64.apk"
+
+          cp_first artifacts/tar-gz-x86-64-result '*.tar.gz' "release-assets/LightingSend-${VERSION}-linux-x86-64.tar.gz"
+          cp_first artifacts/tar-gz-arm-64-result '*.tar.gz' "release-assets/LightingSend-${VERSION}-linux-arm-64.tar.gz"
+          cp_first artifacts/deb-x86-64-result '*.deb' "release-assets/LightingSend-${VERSION}-linux-x86-64.deb"
+          cp_first artifacts/deb-arm-64-result '*.deb' "release-assets/LightingSend-${VERSION}-linux-arm-64.deb"
+          cp_first artifacts/appimage-x86-64-result '*.AppImage' "release-assets/LightingSend-${VERSION}-linux-x86-64.AppImage"
+          cp_first artifacts/appimage-arm-64-result '*.AppImage' "release-assets/LightingSend-${VERSION}-linux-arm-64.AppImage"
+          cp_first artifacts/macos-dmg-arm64-result '*.dmg' "release-assets/LightingSend-${VERSION}-macos-arm64.dmg"
+          cp_first artifacts/macos-dmg-x86_64-result '*.dmg' "release-assets/LightingSend-${VERSION}-macos-x86_64.dmg"
+          cp_first artifacts/windows-zip-x86-64-result '*.zip' "release-assets/LightingSend-${VERSION}-windows-x86-64.zip"
+          cp_first artifacts/windows-zip-arm-64-result '*.zip' "release-assets/LightingSend-${VERSION}-windows-arm-64.zip"
+          cp_first artifacts/windows-exe-x86-64-result '*.exe' "release-assets/LightingSend-${VERSION}-windows-x86-64.exe"
+          cp_first artifacts/cli-linux-x86-64-result '*.tar.gz' "release-assets/LightingSend-CLI-${VERSION}-linux-x86-64.tar.gz"
+          cp_first artifacts/cli-linux-arm-64-result '*.tar.gz' "release-assets/LightingSend-CLI-${VERSION}-linux-arm-64.tar.gz"
+          cp_first artifacts/windows-cli-exe-x86-64-result '*.exe' "release-assets/LightingSend-CLI-${VERSION}-windows-x86-64.exe"
+          cp_first artifacts/windows-cli-exe-arm-64-result '*.exe' "release-assets/LightingSend-CLI-${VERSION}-windows-arm-64.exe"
+
+          find release-assets -maxdepth 1 -type f -print | sort
+
+      - name: Generate checksums
+        run: |
+          set -euo pipefail
+          cd release-assets
+          ASSET_COUNT="$(find . -maxdepth 1 -type f | wc -l | tr -d ' ')"
+          if [ "${ASSET_COUNT}" -lt 1 ]; then
+            echo "::error::no release assets collected, refusing to checksum an empty set"
+            exit 1
+          fi
+          find . -maxdepth 1 -type f -print0 | sort -z | xargs -0 -r sha256sum > ../checksums.txt
+          find . -maxdepth 1 -type f -print0 | sort -z | xargs -0 -r md5sum > ../checksums-md5.txt
+          find . -maxdepth 1 -type f -print0 | sort -z | xargs -0 -r sha1sum > ../checksums-sha1.txt
+          for SUM in ../checksums.txt ../checksums-md5.txt ../checksums-sha1.txt; do
+            if [ "$(wc -l < "${SUM}" | tr -d ' ')" -ne "${ASSET_COUNT}" ]; then
+              echo "::error::${SUM} line count does not match the asset count"
+              exit 1
+            fi
+          done
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          upload_url: ${{ steps.draft_release.outputs.upload_url }}
-          asset_path: result-cli.exe
-          asset_name: LightingSend-CLI-${{ steps.get_version.outputs.version }}-windows-arm-64.exe
-          asset_content_type: application/vnd.microsoft.portable-executable
+          tag_name: v${{ steps.get_version.outputs.version }}
+          name: LightingSend ${{ steps.get_version.outputs.version }}
+          body: |
+            LightingSend ${{ steps.get_version.outputs.version }} release.
+
+            - Windows: NSIS/Inno Setup installer (`LightingSend-${{ steps.get_version.outputs.version }}-windows-x86-64.exe`)
+            - macOS Intel: ad-hoc signed DMG (`LightingSend-${{ steps.get_version.outputs.version }}-macos-x86_64.dmg`)
+            - macOS Apple Silicon: ad-hoc signed DMG (`LightingSend-${{ steps.get_version.outputs.version }}-macos-arm64.dmg`)
+            - Linux: AppImage (`LightingSend-${{ steps.get_version.outputs.version }}-linux-x86-64.AppImage` / `LightingSend-${{ steps.get_version.outputs.version }}-linux-arm-64.AppImage`)
+            - Android: APK (`arm32v7` / `arm64v8` / `x64`)
+
+            Checksums for every asset are in `checksums.txt`, `checksums-md5.txt` and `checksums-sha1.txt`.
+          files: |
+            release-assets/*
+            checksums.txt
+            checksums-md5.txt
+            checksums-sha1.txt
+          fail_on_unmatched_files: true

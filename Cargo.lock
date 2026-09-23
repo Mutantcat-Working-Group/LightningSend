@@ -2150,7 +2150,7 @@ dependencies = [
 
 [[package]]
 name = "lightingsend-cli"
-version = "1.18.2"
+version = "1.0.20260923"
 dependencies = [
  "anyhow",
  "bytes",

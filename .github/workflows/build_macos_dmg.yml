@@ -1,0 +1,89 @@
+name: Build macOS DMG
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+env:
+  FLUTTER_VERSION: "3.41.9"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Get version from pubspec.yaml
+        id: get_version
+        run: |
+          VERSION=$(sed -n 's/^version: \([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p' app/pubspec.yaml)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+
+      - name: Dependencies
+        working-directory: app
+        run: flutter pub get
+
+      - name: Compile macOS
+        working-directory: app
+        run: flutter build macos --release
+
+      - name: Stage, sign and package DMG
+        id: package
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.get_version.outputs.version }}"
+          APP_SRC="$(find app/build/macos/Build/Products/Release -maxdepth 1 -name '*.app' -print -quit)"
+          if [ -z "${APP_SRC}" ]; then
+            echo "::error::no .app bundle produced"
+            exit 1
+          fi
+
+          STAGE="stage"
+          rm -rf "${STAGE}"
+          mkdir -p "${STAGE}"
+          ditto "${APP_SRC}" "${STAGE}/LightingSend.app"
+          xattr -cr "${STAGE}/LightingSend.app"
+          codesign --force --deep --sign - --identifier org.mutantcat.lightingsend "${STAGE}/LightingSend.app"
+          ln -s /Applications "${STAGE}/Applications"
+
+          DMG="LightingSend-${VERSION}-macos-${{ matrix.arch }}.dmg"
+          hdiutil create -volname "LightingSend ${VERSION}" -srcfolder "${STAGE}" -ov -format UDZO "${DMG}"
+          codesign --force --sign - "${DMG}"
+          echo "dmg=${DMG}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify DMG and architecture
+        run: |
+          set -euo pipefail
+          DMG="${{ steps.package.outputs.dmg }}"
+          hdiutil verify "${DMG}"
+          EXEC_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' stage/LightingSend.app/Contents/Info.plist)"
+          EXEC="stage/LightingSend.app/Contents/MacOS/${EXEC_NAME}"
+          ARCHS="$(lipo -archs "${EXEC}")"
+          echo "executable ${EXEC_NAME} architectures: ${ARCHS}"
+          if ! printf '%s\n' "${ARCHS}" | tr ' ' '\n' | grep -qx "${{ matrix.arch }}"; then
+            echo "::error::${DMG} does not contain ${{ matrix.arch }}"
+            exit 1
+          fi
+          codesign --verify --deep --strict stage/LightingSend.app
+          echo "DMG verified: ${DMG}"
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v6
+        with:
+          name: macos-dmg-${{ matrix.arch }}-result
+          path: LightingSend-*.dmg
+          if-no-files-found: error
