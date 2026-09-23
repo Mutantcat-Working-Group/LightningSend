@@ -39,6 +39,13 @@ jobs:
 
       - name: Compile macOS
         working-directory: app
+        env:
+          # The Xcode project carries the upstream Apple Developer team, which
+          # has no certificate on the runner. FLUTTER_XCODE_* variables are
+          # forwarded by Flutter as xcodebuild command line build settings.
+          # The DMG step below re-signs the bundle ad-hoc.
+          FLUTTER_XCODE_CODE_SIGNING_ALLOWED: "NO"
+          FLUTTER_XCODE_CODE_SIGNING_REQUIRED: "NO"
         run: flutter build macos --release
 
       - name: Stage, sign and package DMG

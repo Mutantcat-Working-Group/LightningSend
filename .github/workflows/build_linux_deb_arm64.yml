@@ -61,7 +61,8 @@ jobs:
         id: find_deb
         run: |
           VERSION=${{ needs.build.outputs.version }}
-          DEB_PATH=$(find app/dist -name "lightingsend_app-$VERSION*-linux.deb")
+          # flutter_distributor derives the file name from the pubspec package name
+          DEB_PATH=$(find app/dist -type f -name "localsend_app-$VERSION*-linux.deb" -print -quit)
           echo "deb_path=$DEB_PATH" >> $GITHUB_OUTPUT
 
       - name: Check if deb file exists

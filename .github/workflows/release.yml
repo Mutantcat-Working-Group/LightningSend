@@ -254,9 +254,15 @@ jobs:
             cp -v "${file}" "${dest}"
           }
 
-          cp -v artifacts/apk-result/app-armeabi-v7a-release.apk "release-assets/LightingSend-${VERSION}-android-arm32v7.apk"
-          cp -v artifacts/apk-result/app-arm64-v8a-release.apk "release-assets/LightingSend-${VERSION}-android-arm64v8.apk"
-          cp -v artifacts/apk-result/app-x86_64-release.apk "release-assets/LightingSend-${VERSION}-android-x64.apk"
+          # AGP appends "-unsigned" to the APK name when no keystore is configured
+          for APK in artifacts/apk-result/*.apk; do
+            case "$(basename "${APK}")" in
+              app-armeabi-v7a-release*.apk) cp -v "${APK}" "release-assets/LightingSend-${VERSION}-android-arm32v7.apk" ;;
+              app-arm64-v8a-release*.apk)   cp -v "${APK}" "release-assets/LightingSend-${VERSION}-android-arm64v8.apk" ;;
+              app-x86_64-release*.apk)      cp -v "${APK}" "release-assets/LightingSend-${VERSION}-android-x64.apk" ;;
+              *) echo "::error::unexpected APK ${APK}"; exit 1 ;;
+            esac
+          done
 
           cp_first artifacts/tar-gz-x86-64-result '*.tar.gz' "release-assets/LightingSend-${VERSION}-linux-x86-64.tar.gz"
           cp_first artifacts/tar-gz-arm-64-result '*.tar.gz' "release-assets/LightingSend-${VERSION}-linux-arm-64.tar.gz"

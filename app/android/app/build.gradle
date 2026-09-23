@@ -67,7 +67,12 @@ android {
 
     buildTypes {
         release {
-            signingConfig signingConfigs.release
+            // Without app/android/key.properties (e.g. public CI) the release
+            // signing config has no keystore, and AGP fails the packaging task.
+            // In that case keep the release build unsigned.
+            if (signingConfigs.release.storeFile != null) {
+                signingConfig signingConfigs.release
+            }
         }
         debug {
             applicationIdSuffix ".debug"
