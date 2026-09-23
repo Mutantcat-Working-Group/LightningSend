@@ -1,0 +1,215 @@
+name: Build windows NSIS installer
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+env:
+  FLUTTER_VERSION: "3.41.9"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Get version from pubspec.yaml
+        id: get_version
+        run: |
+          VERSION=$(sed -n 's/^version: \([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p' app/pubspec.yaml)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+  build_windows_nsis:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            arch: x64
+            suffix: x86-64
+            flutter_version: "3.41.9"
+            signtool_arch: x64
+          - runner: windows-11-arm
+            arch: arm64
+            suffix: arm-64
+            flutter_version: "3.47.4"
+            signtool_arch: arm64
+    runs-on: ${{ matrix.runner }}
+    environment: packaging
+    permissions:
+      id-token: write # OIDC token for Azure login
+      contents: read
+
+    steps:
+      - name: Fix long file paths
+        run: git config --system core.longpaths true
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Flutter SDK
+        if: matrix.arch == 'x64'
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ matrix.flutter_version }}
+          channel: "stable"
+
+      # Flutter doesn't provide Windows ARM64 binaries, so clone the SDK from GitHub instead of using a setup action.
+      - name: Setup Flutter SDK (arm64)
+        if: matrix.arch == 'arm64'
+        run: |
+          git clone --depth 1 --branch ${{ matrix.flutter_version }} https://github.com/flutter/flutter.git $env:USERPROFILE\flutter
+          Add-Content $env:GITHUB_PATH "$env:USERPROFILE\flutter\bin"
+          & "$env:USERPROFILE\flutter\bin\flutter.bat" --version
+
+      # Flutter silently falls back to an x64 Dart SDK when arm64 artifacts are missing, which would produce an x64 build
+      - name: Verify native arm64 toolchain
+        if: matrix.arch == 'arm64'
+        run: |
+          $dartVersion = & "$env:USERPROFILE\flutter\bin\dart.bat" --version 2>&1 | Out-String
+          Write-Host $dartVersion
+          if ($dartVersion -notmatch 'windows_arm64') {
+            Write-Error "Dart SDK is not windows_arm64 - Flutter fell back to x64"
+            exit 1
+          }
+
+      - name: Azure login
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # Required by the CMake install step (app/windows/CMakeLists.txt installs lightingsend_msix_helper.msix).
+      # The checked-in manifest declares x64; patch it so the package identity matches the arm64 executable.
+      - name: Build MSIX helper
+        run: |
+          if ('${{ matrix.arch }}' -eq 'arm64') {
+            $manifest = 'support\build\msix\content\AppxManifest.xml'
+            (Get-Content $manifest) -replace 'ProcessorArchitecture="x64"', 'ProcessorArchitecture="arm64"' | Set-Content $manifest
+            if (-not (Select-String -Path $manifest -Pattern 'ProcessorArchitecture="arm64"' -Quiet)) {
+              Write-Error "Failed to patch ProcessorArchitecture in $manifest"
+              exit 1
+            }
+          }
+          $makepri = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\10.*\x64\makepri.exe' | Select-Object -Last 1
+          & $makepri.FullName new /pr support\build\msix\content /cf support\build\msix\priconfig.xml /mn support\build\msix\content\AppxManifest.xml /of support\build\msix\content\resources.pri /o
+          & 'C:\Program Files (x86)\Windows Kits\10\App Certification Kit\makeappx.exe' pack /o /d support\build\msix\content /nv /p app\windows\lightingsend_msix_helper.msix
+
+      # The sparse package needs its own signature (Add-AppxPackage rejects unsigned packages);
+      # signing the surrounding installer does not cover it. Sign before "flutter build windows"
+      # so CMake bundles the signed msix into the Release directory.
+      - name: Sign MSIX helper (Azure Trusted Signing)
+        uses: azure/trusted-signing-action@v2
+        with:
+          endpoint: https://neu.codesigning.azure.net/
+          trusted-signing-account-name: tienisto
+          certificate-profile-name: localsend
+          files-folder: ${{ github.workspace }}\app\windows
+          files-folder-filter: msix
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Verify MSIX signature
+        continue-on-error: true
+        run: |
+          $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\10.*\${{ matrix.signtool_arch }}\signtool.exe' | Select-Object -Last 1
+          & $signtool.FullName verify /pa /v app\windows\lightingsend_msix_helper.msix
+
+      - name: Dependencies
+        working-directory: app
+        run: flutter pub get
+
+      - name: Compile for Windows
+        working-directory: app
+        run: flutter build windows
+
+      - name: Sign app binaries (Azure Trusted Signing)
+        uses: azure/trusted-signing-action@v2
+        with:
+          endpoint: https://neu.codesigning.azure.net/
+          trusted-signing-account-name: tienisto
+          certificate-profile-name: localsend
+          files-folder: ${{ github.workspace }}\app\build\windows\${{ matrix.arch }}\runner\Release
+          files-folder-filter: exe,dll
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Verify app signature
+        continue-on-error: true
+        run: |
+          $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\10.*\${{ matrix.signtool_arch }}\signtool.exe' | Select-Object -Last 1
+          & $signtool.FullName verify /pa /v app\build\windows\${{ matrix.arch }}\runner\Release\lightingsend_app.exe
+
+      - name: Prepare NSIS payload
+        run: |
+          New-Item -ItemType Directory -Force -Path "${{ runner.temp }}\nsis" | Out-Null
+          Copy-Item -Path "app\build\windows\${{ matrix.arch }}\runner\Release\*" -Destination "${{ runner.temp }}\nsis" -Recurse
+          Copy-Item -Path "app\assets\packaging\logo.ico" -Destination "${{ runner.temp }}\nsis"
+          if ('${{ matrix.arch }}' -eq 'x64') {
+            Copy-Item -Path "support\build\windows\x64\*" -Destination "${{ runner.temp }}\nsis" -Recurse
+          } else {
+            $crt = Get-ChildItem 'C:\Program Files\Microsoft Visual Studio\2022\*\VC\Redist\MSVC\*\arm64\Microsoft.VC143.CRT' | Select-Object -Last 1
+            Copy-Item "$($crt.FullName)\msvcp140.dll" "${{ runner.temp }}\nsis"
+            Copy-Item "$($crt.FullName)\vcruntime140.dll" "${{ runner.temp }}\nsis"
+            Copy-Item "$($crt.FullName)\vcruntime140_1.dll" "${{ runner.temp }}\nsis"
+          }
+          New-Item -ItemType Directory -Force -Path "${{ runner.temp }}\nsis-result" | Out-Null
+
+      - name: Install NSIS if missing
+        run: |
+          if (-not (Test-Path 'C:\Program Files (x86)\NSIS\makensis.exe')) {
+            choco install nsis -y --no-progress
+          }
+
+      - name: Compile NSIS installer
+        run: |
+          $makensis = Get-ChildItem 'C:\Program Files (x86)\NSIS\makensis.exe' | Select-Object -First 1
+          if (-not $makensis) {
+            Write-Error 'NSIS makensis.exe not found'
+            exit 1
+          }
+          $Version = "${{ needs.build.outputs.version }}"
+          if ($Version -match '^(\d+)\.(\d+)\.(\d{8})$') {
+            $ViVersion = "$($Matches[1]).$($Matches[2]).$($Matches[3].Substring(0, 4)).$([int]$Matches[3].Substring(4))"
+          } else {
+            $ViVersion = "$Version.0"
+          }
+          & $makensis.FullName "/DVERSION=$Version" "/DVI_VERSION=$ViVersion" "/DPayloadDir=${{ runner.temp }}\nsis" "/DResultDir=${{ runner.temp }}\nsis-result" support\scripts\compile_windows_nsis.nsi
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Rename installer
+        run: Rename-Item -Path "${{ runner.temp }}\nsis-result\LightingSend-Setup.exe" -NewName "LightingSend-${{ needs.build.outputs.version }}-windows-${{ matrix.suffix }}.exe"
+
+      - name: Sign installer (Azure Trusted Signing)
+        uses: azure/trusted-signing-action@v2
+        with:
+          endpoint: https://neu.codesigning.azure.net/
+          trusted-signing-account-name: tienisto
+          certificate-profile-name: localsend
+          files-folder: ${{ runner.temp }}\nsis-result
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Verify installer signature
+        continue-on-error: true
+        run: |
+          $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\10.*\${{ matrix.signtool_arch }}\signtool.exe' | Select-Object -Last 1
+          & $signtool.FullName verify /pa /v "${{ runner.temp }}\nsis-result\LightingSend-${{ needs.build.outputs.version }}-windows-${{ matrix.suffix }}.exe"
+
+      - name: Upload NSIS installer
+        uses: actions/upload-artifact@v6
+        with:
+          name: windows-nsis-${{ matrix.suffix }}-result
+          path: ${{ runner.temp }}\nsis-result\LightingSend-${{ needs.build.outputs.version }}-windows-${{ matrix.suffix }}.exe
+          if-no-files-found: error

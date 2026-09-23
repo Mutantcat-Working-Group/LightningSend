@@ -1157,12 +1157,12 @@ async fn test_prepare_upload_aborted_by_sender_disconnect_tls() {
     let _ = tracing_subscriber::fmt().with_test_writer().try_init();
 
     let server_key = rcgen::KeyPair::generate().unwrap();
-    let server_cert = rcgen::CertificateParams::new(vec!["LocalSend User".to_string()])
+    let server_cert = rcgen::CertificateParams::new(vec!["LightingSend User".to_string()])
         .unwrap()
         .self_signed(&server_key)
         .unwrap();
     let sender_key = rcgen::KeyPair::generate().unwrap();
-    let sender_cert = rcgen::CertificateParams::new(vec!["LocalSend User".to_string()])
+    let sender_cert = rcgen::CertificateParams::new(vec!["LightingSend User".to_string()])
         .unwrap()
         .self_signed(&sender_key)
         .unwrap();

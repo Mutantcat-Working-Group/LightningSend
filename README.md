@@ -27,6 +27,7 @@
 | Linux | x86_64 / arm64 | `.AppImage`、`.deb`、`.tar.gz` |
 | Android | arm32v7 / arm64v8 / x64 | `.apk` |
 | CLI | Linux / Windows | 独立命令行二进制 |
+| Server | Linux x86_64 / arm64 | `server` 二进制 `.tar.gz`、Docker 镜像 `.tar.gz` |
 
 > [!NOTE]
 > 首次使用请保持发送端与接收端处于同一局域网；如设备无法发现，请检查路由器是否开启了 AP Isolation，并允许本应用的局域网通信权限。
@@ -49,7 +50,8 @@
 - [X] 文件、目录、文本与剪贴板互传
 - [X] 命令行客户端 `lightingsend-cli`
 - [X] 多平台、多架构 CI 打包与 Release 发布流程
-- [ ] macOS DMG 双架构打包完善
+- [X] macOS DMG 双架构打包完善
+- [X] Server / CLI 非桌面版打包与 Docker 镜像产物
 - [ ] 自动更新通道
 
 ### 七、从源码构建

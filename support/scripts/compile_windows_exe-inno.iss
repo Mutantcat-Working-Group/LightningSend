@@ -12,9 +12,9 @@
 #endif
 
 #define MyAppName "LightingSend"
-#define MyAppVersion "1.0.20260923"
-#define MyAppPublisher "Tien Do Nam"
-#define MyAppURL "https://localsend.org"
+#define MyAppVersion "1.0.20260920"
+#define MyAppPublisher "Mutantcat Working Group"
+#define MyAppURL "https://github.com/Mutantcat-Working-Group/LightningSend"
 #define MyAppExeName "lightingsend_app.exe"
 #define MyAppMsixHelper "lightingsend_msix_helper.msix"
 
@@ -106,5 +106,5 @@ Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -Command Add-Ap
 
 [UninstallRun]
 #ifndef SkipMsixHelper
-Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -Command Get-AppxPackage LightingSend.App | Remove-AppxPackage"; Flags: nowait runhidden
+Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -Command Get-AppxPackage org.mutantcat.lightingsend | Remove-AppxPackage"; Flags: nowait runhidden
 #endif

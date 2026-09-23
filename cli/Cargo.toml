@@ -1,6 +1,6 @@
 [package]
 name = "lightingsend-cli"
-version = "1.0.20260923"
+version = "1.0.20260920"
 edition = "2024"
 
 [[bin]]

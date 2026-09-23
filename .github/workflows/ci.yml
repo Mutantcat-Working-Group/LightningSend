@@ -110,6 +110,13 @@ jobs:
           echo "Inno Setup version is $VERSION"
           echo "inno_version=$VERSION" >> $GITHUB_ENV
 
+      - name: Extract version from NSIS configuration
+        id: nsis_version
+        run: |
+          VERSION=$(grep '^  !define VERSION ' support/scripts/compile_windows_nsis.nsi | sed 's/^  !define VERSION "//' | sed 's/"//')
+          echo "NSIS version is $VERSION"
+          echo "nsis_version=$VERSION" >> $GITHUB_ENV
+
       - name: Extract version from CLI Cargo.toml
         id: cli_version
         run: |
@@ -124,6 +131,13 @@ jobs:
           echo "MSIX helper version is $VERSION"
           echo "msix_version=$VERSION" >> $GITHUB_ENV
 
+      - name: Extract NSIS Windows resource version
+        id: nsis_vi_version
+        run: |
+          VERSION=$(grep '^  !define VI_VERSION ' support/scripts/compile_windows_nsis.nsi | sed 's/^  !define VI_VERSION "//' | sed 's/"//')
+          echo "NSIS Windows resource version is $VERSION"
+          echo "nsis_vi_version=$VERSION" >> $GITHUB_ENV
+
       - name: Extract version from AppImage recipes
         id: appimage_version
         run: |
@@ -134,9 +148,18 @@ jobs:
           echo "AppImage arm_64 version is $VERSION_ARM_64"
           echo "appimage_arm_64_version=$VERSION_ARM_64" >> $GITHUB_ENV
 
-      - name: Compare pubspec, Inno Setup, CLI, MSIX helper and AppImage versions
+      - name: Compare pubspec, Inno Setup, NSIS, CLI, MSIX helper and AppImage versions
         run: |
-          if [ "$pubspec_version" != "$inno_version" ] || [ "$pubspec_version" != "$cli_version" ] || [ "$pubspec_version.0" != "$msix_version" ] || [ "$pubspec_version" != "$appimage_x86_64_version" ] || [ "$pubspec_version" != "$appimage_arm_64_version" ]; then
+          # MSIX caps each version part at 65535, so 1.0.YYYYMMDD must be
+          # encoded as 1.0.YYYY.MMDD (leading zero stripped).
+          MSIX_EXPECTED="$pubspec_version.0"
+          if [[ "$pubspec_version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]{8})$ ]]; then
+            YEAR="${BASH_REMATCH[3]:0:4}"
+            MONTH_DAY="${BASH_REMATCH[3]:4:4}"
+            MSIX_EXPECTED="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${YEAR}.$((10#$MONTH_DAY))"
+          fi
+          echo "Expected MSIX helper version is $MSIX_EXPECTED"
+          if [ "$pubspec_version" != "$inno_version" ] || [ "$pubspec_version" != "$nsis_version" ] || [ "$pubspec_version" != "$cli_version" ] || [ "$MSIX_EXPECTED" != "$msix_version" ] || [ "$MSIX_EXPECTED" != "$nsis_vi_version" ] || [ "$pubspec_version" != "$appimage_x86_64_version" ] || [ "$pubspec_version" != "$appimage_arm_64_version" ]; then
             echo "Version mismatch detected!"
             exit 1
           else

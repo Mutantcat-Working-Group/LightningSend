@@ -40,9 +40,9 @@ class AboutPage extends StatelessWidget {
           Center(
             child: TextButton(
               onPressed: () async {
-                await launchUrl(Uri.parse('https://localsend.org'));
+                await launchUrl(Uri.parse('https://github.com/Mutantcat-Working-Group/LightningSend'));
               },
-              child: const Text('localsend.org'),
+              child: const Text('LightingSend'),
             ),
           ),
           const SizedBox(height: 10),
@@ -137,21 +137,15 @@ class AboutPage extends StatelessWidget {
             children: [
               TextButton(
                 onPressed: () async {
-                  await launchUrl(Uri.parse('https://localsend.org'));
+                  await launchUrl(Uri.parse('https://github.com/Mutantcat-Working-Group/LightningSend'));
                 },
                 child: const Text('Homepage'),
               ),
               TextButton(
                 onPressed: () async {
-                  await launchUrl(Uri.parse('https://github.com/localsend/localsend'), mode: LaunchMode.externalApplication);
+                  await launchUrl(Uri.parse('https://github.com/Mutantcat-Working-Group/LightningSend'), mode: LaunchMode.externalApplication);
                 },
                 child: const Text('Source Code (Github)'),
-              ),
-              TextButton(
-                onPressed: () async {
-                  await launchUrl(Uri.parse('https://codeberg.org/localsend/localsend'), mode: LaunchMode.externalApplication);
-                },
-                child: const Text('Source Code (Codeberg)'),
               ),
               TextButton(
                 onPressed: () async {

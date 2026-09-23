@@ -1,7 +1,7 @@
 display_name: LightingSend
 packager: Tienisto
 packagerEmail: dev.tien.donam@gmail.com
-url: https://localsend.org
+url: https://github.com/Mutantcat-Working-Group/LightningSend
 buildArch: x86_64
 license: MIT
 

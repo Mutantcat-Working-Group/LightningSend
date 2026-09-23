@@ -23,7 +23,7 @@ pub struct SelfSignedCert {
 ///
 /// - RSA-2048, matching the certificates the Flutter app has historically
 ///   generated in Dart.
-/// - `CN=LocalSend User` and no SANs: peers identify each other purely by the
+/// - `CN=LightingSend User` and no SANs: peers identify each other purely by the
 ///   certificate fingerprint, so the name carries no information.
 /// - The serial number is derived from the hash of the public key
 ///   (rcgen's default when no serial number is set).
@@ -44,7 +44,7 @@ pub fn generate_self_signed() -> anyhow::Result<SelfSignedCert> {
     params.distinguished_name = rcgen::DistinguishedName::new();
     params
         .distinguished_name
-        .push(rcgen::DnType::CommonName, "LocalSend User");
+        .push(rcgen::DnType::CommonName, "LightingSend User");
     let certificate = params.self_signed(&key_pair)?;
 
     Ok(SelfSignedCert {
