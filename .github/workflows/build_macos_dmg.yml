@@ -37,6 +37,11 @@ jobs:
         working-directory: app
         run: flutter pub get
 
+      # connectivity_plus 7.3.1 does not compile against the Xcode version
+      # available on these runners; see the script for the details.
+      - name: Patch connectivity_plus macOS sources
+        run: support/scripts/patch_connectivity_plus_macos.sh
+
       - name: Compile macOS
         working-directory: app
         env:
