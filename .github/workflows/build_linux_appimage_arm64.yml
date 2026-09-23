@@ -58,27 +58,10 @@ jobs:
         working-directory: app
         run: flutter build linux
 
-      - name: Copy compiled linux files
-        run: |
-          mkdir AppDir
-          cp -r app/build/linux/arm64/release/bundle/* AppDir/
-
-      - name: Copy logo to AppDir
-        run: |
-          mkdir -p AppDir/usr/share/icons/hicolor/32x32/apps
-          cp app/assets/img/logo-32.png AppDir/usr/share/icons/hicolor/32x32/apps/lightingsend.png
-          mkdir -p AppDir/usr/share/icons/hicolor/128x128/apps
-          cp app/assets/img/logo-128.png AppDir/usr/share/icons/hicolor/128x128/apps/lightingsend.png
-          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
-          cp app/assets/img/logo-256.png AppDir/usr/share/icons/hicolor/256x256/apps/lightingsend.png
-
-      - name: Copy Recipe to correct location
-        run: cp support/build/appimage/AppImageBuilder_arm_64.yml AppImageBuilder.yml
-
+      # appimage-builder's Docker image only exists for amd64, so build the
+      # AppImage natively for the architecture of this runner instead.
       - name: Build AppImage
-        uses: AppImageCrafters/build-appimage@57c3bc6963f870ce3be103117de5b5e33ffbaeb6
-        with:
-          recipe: ./AppImageBuilder.yml
+        run: support/scripts/compile_linux_appimage_native.sh app/build/linux/arm64/release/bundle
 
       - name: Upload AppImage file
         uses: actions/upload-artifact@v6
