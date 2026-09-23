@@ -78,6 +78,7 @@ jobs:
           }
 
       - name: Azure login
+        if: ${{ secrets.AZURE_CLIENT_ID != '' }}
         uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -104,6 +105,7 @@ jobs:
       # signing the surrounding installer does not cover it. Sign before "flutter build windows"
       # so CMake bundles the signed msix into the Release directory.
       - name: Sign MSIX helper (Azure Trusted Signing)
+        if: ${{ secrets.AZURE_CLIENT_ID != '' }}
         uses: azure/trusted-signing-action@v2
         with:
           endpoint: https://neu.codesigning.azure.net/
@@ -116,6 +118,7 @@ jobs:
           timestamp-digest: SHA256
 
       - name: Verify MSIX signature
+        if: ${{ secrets.AZURE_CLIENT_ID != '' }}
         continue-on-error: true
         run: |
           $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\10.*\${{ matrix.signtool_arch }}\signtool.exe' | Select-Object -Last 1
@@ -130,6 +133,7 @@ jobs:
         run: flutter build windows
 
       - name: Sign app binaries (Azure Trusted Signing)
+        if: ${{ secrets.AZURE_CLIENT_ID != '' }}
         uses: azure/trusted-signing-action@v2
         with:
           endpoint: https://neu.codesigning.azure.net/
@@ -142,6 +146,7 @@ jobs:
           timestamp-digest: SHA256
 
       - name: Verify app signature
+        if: ${{ secrets.AZURE_CLIENT_ID != '' }}
         continue-on-error: true
         run: |
           $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\10.*\${{ matrix.signtool_arch }}\signtool.exe' | Select-Object -Last 1
@@ -190,6 +195,7 @@ jobs:
         run: Rename-Item -Path "${{ runner.temp }}\nsis-result\LightingSend-Setup.exe" -NewName "LightingSend-${{ needs.build.outputs.version }}-windows-${{ matrix.suffix }}.exe"
 
       - name: Sign installer (Azure Trusted Signing)
+        if: ${{ secrets.AZURE_CLIENT_ID != '' }}
         uses: azure/trusted-signing-action@v2
         with:
           endpoint: https://neu.codesigning.azure.net/
@@ -202,6 +208,7 @@ jobs:
           timestamp-digest: SHA256
 
       - name: Verify installer signature
+        if: ${{ secrets.AZURE_CLIENT_ID != '' }}
         continue-on-error: true
         run: |
           $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\10.*\${{ matrix.signtool_arch }}\signtool.exe' | Select-Object -Last 1

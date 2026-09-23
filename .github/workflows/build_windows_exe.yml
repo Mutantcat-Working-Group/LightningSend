@@ -43,6 +43,7 @@ jobs:
           channel: "stable"
 
       - name: Azure login
+        if: ${{ secrets.AZURE_CLIENT_ID != '' }}
         uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -59,6 +60,7 @@ jobs:
       # signing the surrounding installer does not cover it. Sign before "flutter build windows"
       # so CMake bundles the signed msix into the Release directory.
       - name: Sign MSIX helper (Azure Trusted Signing)
+        if: ${{ secrets.AZURE_CLIENT_ID != '' }}
         uses: azure/trusted-signing-action@v2
         with:
           endpoint: https://neu.codesigning.azure.net/
@@ -71,6 +73,7 @@ jobs:
           timestamp-digest: SHA256
 
       - name: Verify MSIX signature
+        if: ${{ secrets.AZURE_CLIENT_ID != '' }}
         continue-on-error: true
         run: |
           $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\10.*\x64\signtool.exe' | Select-Object -Last 1
@@ -85,6 +88,7 @@ jobs:
         run: flutter build windows
 
       - name: Sign app binaries (Azure Trusted Signing)
+        if: ${{ secrets.AZURE_CLIENT_ID != '' }}
         uses: azure/trusted-signing-action@v2
         with:
           endpoint: https://neu.codesigning.azure.net/
@@ -107,6 +111,7 @@ jobs:
       # Inno signs the setup exe AND the embedded uninstaller at compile time via the MySignTool
       # command; signing the finished installer afterwards would leave unins000.exe unsigned.
       - name: Prepare Trusted Signing sign tool for Inno Setup
+        if: ${{ secrets.AZURE_CLIENT_ID != '' }}
         run: |
           $dir = "${{ runner.temp }}\trusted-signing"
           New-Item -ItemType Directory -Force -Path $dir | Out-Null
@@ -127,12 +132,18 @@ jobs:
           "@
 
       - name: Compile installer (signed)
+        if: ${{ secrets.AZURE_CLIENT_ID != '' }}
         run: iscc "/SMySignTool=${{ runner.temp }}\trusted-signing\sign.cmd `$f" "/DPayloadDir=${{ runner.temp }}\inno" "/DResultDir=${{ runner.temp }}\inno-result" support\scripts\compile_windows_exe-inno.iss
+
+      - name: Compile installer (unsigned)
+        if: ${{ secrets.AZURE_CLIENT_ID == '' }}
+        run: iscc "/DPayloadDir=${{ runner.temp }}\inno" "/DResultDir=${{ runner.temp }}\inno-result" support\scripts\compile_windows_exe-inno.iss
 
       - name: Rename installer
         run: Rename-Item -Path "${{ runner.temp }}\inno-result\lightingsend.exe" -NewName "LightingSend-${{ needs.build.outputs.version }}-windows-x86-64.exe"
 
       - name: Verify signature
+        if: ${{ secrets.AZURE_CLIENT_ID != '' }}
         continue-on-error: true
         run: |
           $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\10.*\x64\signtool.exe' | Select-Object -Last 1

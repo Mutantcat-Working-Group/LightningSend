@@ -58,6 +58,7 @@ jobs:
         run: flutter build windows
 
       - name: Azure login
+        if: ${{ secrets.AZURE_CLIENT_ID != '' }}
         uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -66,6 +67,7 @@ jobs:
 
       # Sign before "Add DLL files" so the Microsoft-signed CRT DLLs keep their original signature
       - name: Sign app binaries (Azure Trusted Signing)
+        if: ${{ secrets.AZURE_CLIENT_ID != '' }}
         uses: azure/trusted-signing-action@v2
         with:
           endpoint: https://neu.codesigning.azure.net/
@@ -78,6 +80,7 @@ jobs:
           timestamp-digest: SHA256
 
       - name: Verify signature
+        if: ${{ secrets.AZURE_CLIENT_ID != '' }}
         continue-on-error: true
         run: |
           $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\10.*\x64\signtool.exe' | Select-Object -Last 1

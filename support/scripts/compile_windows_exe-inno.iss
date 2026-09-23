@@ -12,7 +12,7 @@
 #endif
 
 #define MyAppName "LightingSend"
-#define MyAppVersion "1.0.20260920"
+#define MyAppVersion "1.0.20260923"
 #define MyAppPublisher "Mutantcat Working Group"
 #define MyAppURL "https://github.com/Mutantcat-Working-Group/LightningSend"
 #define MyAppExeName "lightingsend_app.exe"

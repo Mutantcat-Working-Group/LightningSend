@@ -8,12 +8,12 @@ SetCompressor /SOLID lzma
 !include "MUI2.nsh"
 
 !ifndef VERSION
-  !define VERSION "1.0.20260920"
+  !define VERSION "1.0.20260923"
 !endif
 !ifndef VI_VERSION
   ; Windows version resources require four numeric parts, each <= 65535.
   ; 1.0.YYYYMMDD is encoded as 1.0.YYYY.MMDD (leading zero stripped).
-  !define VI_VERSION "1.0.2026.920"
+  !define VI_VERSION "1.0.2026.923"
 !endif
 !ifndef PayloadDir
   !define PayloadDir "D:\nsis"
