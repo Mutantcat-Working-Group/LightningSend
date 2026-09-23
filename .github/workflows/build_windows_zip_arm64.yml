@@ -31,6 +31,12 @@ jobs:
       id-token: write # OIDC token for Azure login
       contents: read
 
+    # The secrets context is not available in step conditions, so mirror the
+    # client id into env and gate the unsigned fallbacks on that instead.
+    # An empty client id means the repository has no signing credentials.
+    env:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+
     steps:
       - name: Fix long file paths
         run: git config --system core.longpaths true
@@ -78,7 +84,7 @@ jobs:
         run: flutter build windows
 
       - name: Azure login
-        if: ${{ secrets.AZURE_CLIENT_ID != '' }}
+        if: ${{ env.AZURE_CLIENT_ID != '' }}
         uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -87,7 +93,7 @@ jobs:
 
       # Sign before "Add DLL files" so the Microsoft-signed CRT DLLs keep their original signature
       - name: Sign app binaries (Azure Trusted Signing)
-        if: ${{ secrets.AZURE_CLIENT_ID != '' }}
+        if: ${{ env.AZURE_CLIENT_ID != '' }}
         uses: azure/trusted-signing-action@v2
         with:
           endpoint: https://neu.codesigning.azure.net/
@@ -100,7 +106,7 @@ jobs:
           timestamp-digest: SHA256
 
       - name: Verify signature
-        if: ${{ secrets.AZURE_CLIENT_ID != '' }}
+        if: ${{ env.AZURE_CLIENT_ID != '' }}
         continue-on-error: true
         run: |
           $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\10.*\arm64\signtool.exe' | Select-Object -Last 1
