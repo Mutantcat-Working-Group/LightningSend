@@ -10,9 +10,10 @@
 # git reset --hard origin/main
 # git pull
 
+repo_dir=$(basename "$PWD")
 cd ..
 rm -rf /tmp/build
-cp localsend /tmp/build -r
+cp "$repo_dir" /tmp/build -r
 pushd /tmp/build
 
 git submodule update --init
@@ -30,11 +31,11 @@ mkdir AppDir
 cp -r build/linux/x64/release/bundle/* AppDir
 cp support/build/appimage/AppImageBuilder_x86_64.yml AppImageBuilder.yml
 appimage-builder
-sudo chmod +x LocalSend-*-x86_64.AppImage
+sudo chmod +x LightingSend-*-x86_64.AppImage
 
 rm -rf AppDir
 rm -rf appimage-build
 
 popd
-cd localsend
-cp /tmp/build/LocalSend-*-x86_64.AppImage .
+cd "$repo_dir"
+cp /tmp/build/LightingSend-*-x86_64.AppImage .

@@ -321,7 +321,7 @@ mod tests {
                 .unwrap()
                 .as_nanos();
             let path = std::env::temp_dir().join(format!(
-                "localsend-cli-{name}-{}-{nonce}",
+                "lightingsend-cli-{name}-{}-{nonce}",
                 std::process::id()
             ));
             fs::create_dir_all(&path).unwrap();

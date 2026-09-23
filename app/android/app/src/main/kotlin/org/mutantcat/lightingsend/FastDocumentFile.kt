@@ -1,4 +1,4 @@
-package org.localsend.localsend_app
+package org.mutantcat.lightingsend
 
 import android.content.ContentResolver
 import android.content.Context

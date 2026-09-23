@@ -7,11 +7,11 @@ script:
 AppDir:
   path: AppDir
   app_info:
-    id: org.localsend.localsend_app
-    name: LocalSend
-    icon: localsend
+    id: org.mutantcat.lightingsend
+    name: LightingSend
+    icon: lightingsend
     version: 1.18.2
-    exec: localsend_app
+    exec: lightingsend_app
     exec_args: $@
   apt:
     arch:

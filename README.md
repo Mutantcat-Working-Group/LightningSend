@@ -1,10 +1,10 @@
 <div align=center>
 <img src="app/assets/img/logo-512.png" style="width:100px;" width="100"/>
-<h2>LightningSend</h2>
+<h2>LightingSend</h2>
 </div>
 
 ### 一、产品概述
-- **LightningSend** 是一款自由、开源的**局域网文件传输工具**，让附近的设备在同一网络内安全、快速地互传文件、文本与剪贴板内容，全程不需要互联网连接。
+- **LightingSend** 是一款自由、开源的**局域网文件传输工具**，让附近的设备在同一网络内安全、快速地互传文件、文本与剪贴板内容，全程不需要互联网连接。
 - 基于 LocalSend Protocol v2 与 HTTPS 加密，每台设备在本地即时生成 TLS 证书，数据只在你的局域网内流动，不经过任何第三方服务器。
 - 支持 Windows、macOS、Linux、Android 与 iOS 等主流平台，桌面端与移动端使用体验一致。
 - 同时提供命令行客户端 `lightingsend-cli`，适合脚本、自动化与无图形界面的环境。
@@ -32,7 +32,7 @@
 > 首次使用请保持发送端与接收端处于同一局域网；如设备无法发现，请检查路由器是否开启了 AP Isolation，并允许本应用的局域网通信权限。
 
 ### 四、快速上手
-1. 在发送端和接收端分别安装 LightningSend，并连接到同一个局域网。
+1. 在发送端和接收端分别安装 LightingSend，并连接到同一个局域网。
 2. 打开应用，选择文件、目录或剪贴板文本，等待对方设备出现在设备列表中。
 3. 点击目标设备发送，对方确认后即开始传输；也可以扫描二维码快速配对。
 4. 命令行方式：`lightingsend-cli send <文件或目录>`，交互选择目标设备；或使用 `lightingsend-cli send --to <别名或 IP> <文件>` 直接发送。
