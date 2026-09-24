@@ -45,6 +45,14 @@ class AboutPage extends StatelessWidget {
               child: const Text('LightingSend'),
             ),
           ),
+          const SizedBox(height: 8),
+          const Center(
+            child: Text(
+              '由异猫工作群（mutantcat.org）发行',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: Colors.grey),
+            ),
+          ),
           const SizedBox(height: 10),
           Text(t.aboutPage.description.join('\n\n')),
           const SizedBox(height: 20),
