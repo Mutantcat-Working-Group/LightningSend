@@ -8,6 +8,7 @@
 - 安全的、开源免费的局域网文件传输工具，让同一网络内的设备免流量互传文件、目录与文本。
 - 基于 LocalSend Protocol v2 与 HTTPS 加密，TLS 证书在每台设备本地即时生成，数据只在局域网内流动，不经过任何第三方服务器。
 - 支持 Windows、macOS、Linux、Android 与 iOS 等主流平台，桌面端、移动端与命令行客户端体验一致。
+- **发行方** 由异猫工作群（mutantcat.org）发行，GitHub: https://github.com/Mutantcat-Working-Group
 
 核心价值：
 
