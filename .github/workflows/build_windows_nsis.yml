@@ -130,6 +130,35 @@ jobs:
           $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\10.*\${{ matrix.signtool_arch }}\signtool.exe' | Select-Object -Last 1
           & $signtool.FullName verify /pa /v app\windows\lightingsend_msix_helper.msix
 
+      # Without Azure Trusted Signing credentials the artifacts would ship unsigned,
+      # so fall back to a local self-signed certificate for both the app and the installer.
+      - name: Create Windows code-signing certificate
+        if: ${{ env.AZURE_CLIENT_ID == '' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $pfx = Join-Path $env:RUNNER_TEMP 'mutantcat-code-signing.pfx'
+          $password = 'mutantcat'
+          $cert = New-SelfSignedCertificate `
+            -Subject 'CN=Mutantcat Working Group, O=Mutantcat Working Group, C=CN' `
+            -CertStoreLocation 'Cert:\CurrentUser\My' `
+            -KeyUsage DigitalSignature `
+            -Type CodeSigningCert `
+            -KeyExportPolicy Exportable `
+            -KeyLength 2048 `
+            -HashAlgorithm SHA256 `
+            -NotAfter (Get-Date).AddYears(10)
+          Export-PfxCertificate -Cert $cert -FilePath $pfx -Password (ConvertTo-SecureString -String $password -Force -AsPlainText) | Out-Null
+          "PFX_PATH=$pfx" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "SIGN_PASSWORD=$password" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $signtool = $null
+          foreach ($kit in (Get-ChildItem -Path 'C:\Program Files (x86)\Windows Kits\10\bin' -Directory | Sort-Object Name -Descending)) {
+            $candidate = Join-Path $kit.FullName 'x64\signtool.exe'
+            if (Test-Path $candidate) { $signtool = $candidate; break }
+          }
+          if (-not $signtool) { throw 'signtool.exe not found in the Windows SDK' }
+          "SIGNTOOL_PATH=$signtool" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: Dependencies
         working-directory: app
         run: flutter pub get
@@ -151,12 +180,53 @@ jobs:
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
 
+      # makensis copies the payload byte for byte, so anything unsigned stays unsigned.
+      - name: Sign app binaries
+        if: ${{ env.AZURE_CLIENT_ID == '' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not $env:PFX_PATH -or -not $env:SIGNTOOL_PATH) { throw 'code-signing setup did not run' }
+          $payload = "app\build\windows\${{ matrix.arch }}\runner\Release"
+          $targets = @()
+          foreach ($pattern in 'lightingsend_app.exe', '*.dll', '*.msix') {
+            $targets += Get-ChildItem -Path $payload -Filter $pattern -Recurse -File -ErrorAction SilentlyContinue
+          }
+          $targets = $targets | Sort-Object FullName -Unique
+          if ($targets.Count -eq 0) { throw "no Windows binaries found under $payload" }
+          foreach ($target in $targets) {
+            & $env:SIGNTOOL_PATH sign /fd SHA256 /f $env:PFX_PATH /p $env:SIGN_PASSWORD /d 'LightingSend' "$($target.FullName)"
+            echo "signed $($target.Name)"
+          }
+
       - name: Verify app signature
         if: ${{ env.AZURE_CLIENT_ID != '' }}
         continue-on-error: true
         run: |
           $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\10.*\${{ matrix.signtool_arch }}\signtool.exe' | Select-Object -Last 1
           & $signtool.FullName verify /pa /v app\build\windows\${{ matrix.arch }}\runner\Release\lightingsend_app.exe
+
+      # A self-signed certificate reports HashMismatch/UnknownError, so check the
+      # signer subject rather than the overall signature status.
+      - name: Verify self-signed application
+        if: ${{ env.AZURE_CLIENT_ID == '' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not $env:PFX_PATH) { throw 'code-signing setup did not run' }
+          $targets = @()
+          foreach ($pattern in 'lightingsend_app.exe', '*.dll', '*.msix') {
+            $targets += Get-ChildItem -Path "app\build\windows\${{ matrix.arch }}\runner\Release" -Filter $pattern -Recurse -File -ErrorAction SilentlyContinue
+          }
+          $targets = $targets | Sort-Object FullName -Unique
+          if ($targets.Count -eq 0) { throw 'no Windows binaries found to verify' }
+          foreach ($target in $targets) {
+            $signature = Get-AuthenticodeSignature $target.FullName
+            if (-not $signature.SignerCertificate -or $signature.SignerCertificate.Subject -notlike '*CN=Mutantcat Working Group*') {
+              throw "$($target.Name) is not signed by Mutantcat Working Group ($($signature.Status))"
+            }
+            echo "verified $($target.Name)"
+          }
 
       - name: Prepare NSIS payload
         run: |
@@ -213,12 +283,42 @@ jobs:
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
 
+      # The installer is built from the signed payload, but its own seal is separate,
+      # so sign it once the final filename is in place.
+      - name: Sign installer
+        if: ${{ env.AZURE_CLIENT_ID == '' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not $env:PFX_PATH -or -not $env:SIGNTOOL_PATH) { throw 'code-signing setup did not run' }
+          $installer = "${{ runner.temp }}\nsis-result\LightingSend-${{ needs.build.outputs.version }}-windows-${{ matrix.suffix }}.exe"
+          if (-not (Test-Path $installer)) { throw "installer not found: $installer" }
+          & $env:SIGNTOOL_PATH sign /fd SHA256 /f $env:PFX_PATH /p $env:SIGN_PASSWORD /d 'LightingSend Installer' "$installer"
+          echo "signed $(Split-Path -Leaf $installer)"
+
       - name: Verify installer signature
         if: ${{ env.AZURE_CLIENT_ID != '' }}
         continue-on-error: true
         run: |
           $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\10.*\${{ matrix.signtool_arch }}\signtool.exe' | Select-Object -Last 1
           & $signtool.FullName verify /pa /v "${{ runner.temp }}\nsis-result\LightingSend-${{ needs.build.outputs.version }}-windows-${{ matrix.suffix }}.exe"
+
+      - name: Verify self-signed installer
+        if: ${{ env.AZURE_CLIENT_ID == '' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not $env:PFX_PATH) { throw 'code-signing setup did not run' }
+          $installer = "${{ runner.temp }}\nsis-result\LightingSend-${{ needs.build.outputs.version }}-windows-${{ matrix.suffix }}.exe"
+          if (-not (Test-Path $installer)) { throw "installer not found: $installer" }
+          $signature = Get-AuthenticodeSignature $installer
+          if (-not $signature.SignerCertificate -or $signature.SignerCertificate.Subject -notlike '*CN=Mutantcat Working Group*') {
+            throw "$(Split-Path -Leaf $installer) is not self-signed by Mutantcat Working Group ($($signature.Status))"
+          }
+          if ((Split-Path -Leaf $installer) -notmatch 'LightingSend-') {
+            throw "installer was renamed unexpectedly: $installer"
+          }
+          echo "verified $(Split-Path -Leaf $installer)"
 
       - name: Upload NSIS installer
         uses: actions/upload-artifact@v6

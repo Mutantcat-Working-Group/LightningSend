@@ -93,6 +93,31 @@ jobs:
           codesign --verify --deep --strict stage/LightingSend.app
           echo "DMG verified: ${DMG}"
 
+      # The staged folder is not what users get: they receive whatever macOS mounts
+      # from the DMG, so the seal and the /Applications link have to survive it.
+      - name: Verify mounted DMG
+        run: |
+          set -euo pipefail
+          DMG="${{ steps.package.outputs.dmg }}"
+          MOUNT="$(mktemp -d)"
+          hdiutil attach -nobrowse -readonly -mountpoint "${MOUNT}" "${DMG}"
+          trap 'hdiutil detach "${MOUNT}" || true' EXIT
+          if [ ! -L "${MOUNT}/Applications" ]; then
+            echo "::error::${DMG} has no /Applications link"
+            exit 1
+          fi
+          echo "/Applications link -> $(readlink "${MOUNT}/Applications")"
+          APP="${MOUNT}/LightingSend.app"
+          if [ ! -d "${APP}" ]; then
+            echo "::error::no .app bundle in the mounted image"
+            exit 1
+          fi
+          if ! codesign -dv "${APP}" 2>&1 | grep -q 'Signature=adhoc'; then
+            echo "::error::the app inside ${DMG} is not ad-hoc signed"
+            exit 1
+          fi
+          echo "mounted app is ad-hoc signed: ${APP}"
+
       - name: Upload DMG
         uses: actions/upload-artifact@v6
         with:
