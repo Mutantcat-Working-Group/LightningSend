@@ -1,4 +1,4 @@
-; LightingSend NSIS installer.
+﻿; LightingSend NSIS installer.
 ; Payload/output directories and version are overridable from CI via /DVERSION=... /DPayloadDir=... /DResultDir=...
 ; Copy the contents of the Release folder plus app/assets/packaging/logo.ico into PayloadDir first.
 

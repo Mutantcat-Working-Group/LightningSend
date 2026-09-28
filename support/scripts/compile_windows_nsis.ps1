@@ -20,7 +20,9 @@ if (-not $makensis) {
 }
 
 New-Item -ItemType Directory -Force -Path $ResultDir | Out-Null
-& $makensis.FullName "/DVERSION=$Version" "/DVI_VERSION=$ViVersion" "/DPayloadDir=$PayloadDir" "/DResultDir=$ResultDir" .\support\scripts\compile_windows_nsis.nsi
+# Pin both charsets: the script holds Chinese UI strings and would otherwise
+# be read as ACP, which fails on the first Chinese line.
+& $makensis.FullName "-INPUTCHARSET" "UTF8" "-OUTPUTCHARSET" "UTF8" "/DVERSION=$Version" "/DVI_VERSION=$ViVersion" "/DPayloadDir=$PayloadDir" "/DResultDir=$ResultDir" .\support\scripts\compile_windows_nsis.nsi
 if ($LASTEXITCODE -ne 0) {
   exit $LASTEXITCODE
 }

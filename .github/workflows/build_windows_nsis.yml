@@ -262,7 +262,9 @@ jobs:
           } else {
             $ViVersion = "$Version.0"
           }
-          & $makensis.FullName "/DVERSION=$Version" "/DVI_VERSION=$ViVersion" "/DPayloadDir=${{ runner.temp }}\nsis" "/DResultDir=${{ runner.temp }}\nsis-result" support\scripts\compile_windows_nsis.nsi
+          # The script carries Chinese UI strings, so pin both charsets to UTF8
+          # instead of letting makensis fall back to the runner's ACP.
+          & $makensis.FullName "-INPUTCHARSET" "UTF8" "-OUTPUTCHARSET" "UTF8" "/DVERSION=$Version" "/DVI_VERSION=$ViVersion" "/DPayloadDir=${{ runner.temp }}\nsis" "/DResultDir=${{ runner.temp }}\nsis-result" support\scripts\compile_windows_nsis.nsi
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }
